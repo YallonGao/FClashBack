@@ -116,6 +116,8 @@ sqlite3 /data/fclash.db ".backup '/backup/fclash-$(date +%F).db'"
 | GET | `/sync/state` | `{revision, checksum, size, updated_at, device_id}` |
 | GET | `/sync/snapshot` | 当前快照字节，响应头带 `X-Revision` / `X-Checksum` |
 | PUT | `/sync/snapshot?base_revision=N` | 上传新快照；版本不匹配返回 409 |
+| GET | `/sync/profiles?since=N` | 自版本 N 起的订阅变更（含墓碑） |
+| POST | `/sync/profiles` | 上传本地新增/修改/删除，合并后返回变更 |
 | GET | `/sync/history` | 历史版本列表 |
 | GET | `/sync/history/{revision}` | 指定版本内容 |
 | POST | `/sync/restore/{revision}?base_revision=N` | 把旧版本恢复成新版本 |
@@ -135,6 +137,19 @@ sqlite3 /data/fclash.db ".backup '/backup/fclash-$(date +%F).db'"
   }
 }
 ```
+
+## 同步模型
+
+同步的单位是**一条订阅**，不是一整个压缩包：
+
+- 每条订阅在 `profile_states` 里一行，用客户端生成的 id 作为键
+- 删除写墓碑（`deleted = true`）而不是物理删除，否则另一台设备下次同步会把它推回来
+- 每行改动都会拿到一个自增 `revision`，客户端用 `since` 只取自己没见过的部分
+- 内容相同（label + url + type + yaml 的 sha256 相同）的重复推送不会产生新版本
+
+客户端一次同步：先算本地与上次快照的差异 → 有差异就 `POST /sync/profiles`（服务器合并后返回自 `since` 起的全部变化），没差异就 `GET` → 应用返回的变化 → 保存新快照和 revision。**先推后拉**，否则离线期间的本地修改会被云端旧版本覆盖。
+
+快照接口（`/sync/snapshot`）仍然保留，用于整机备份/回滚，但客户端不再用它做日常同步。
 
 ## 客户端约定
 

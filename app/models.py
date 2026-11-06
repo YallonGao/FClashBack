@@ -153,3 +153,49 @@ class Subscription(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
     )
+
+
+class ProfileState(Base):
+    """One subscription as it synced, keyed by the id the client generated.
+
+    The snapshot table stores an opaque archive, which can only be replaced
+    whole. A phone that deleted one subscription would otherwise resurrect it
+    from any device that still had the archive. Keeping a row per profile,
+    with a tombstone instead of a hard delete, is what makes add and remove
+    both propagate.
+    """
+
+    __tablename__ = "profile_states"
+    __table_args__ = (
+        UniqueConstraint("user_id", "profile_id", name="uq_profile_state"),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    profile_id: Mapped[str] = mapped_column(String(32))
+    label: Mapped[str] = mapped_column(String(128), default="")
+    url: Mapped[str] = mapped_column(String(2048), default="")
+    type: Mapped[str] = mapped_column(String(16), default="file")
+    content: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    checksum: Mapped[str] = mapped_column(String(64), default="")
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    revision: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class SyncRevision(Base):
+    """Monotonic counter per account; clients page by it."""
+
+    __tablename__ = "sync_revisions"
+
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    revision: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

@@ -162,3 +162,35 @@ class SubscriptionOut(BaseModel):
     traffic_total: int
     created_at: UtcDateTime
     updated_at: UtcDateTime
+
+
+class ProfilePayloadIn(BaseModel):
+    profile_id: str = Field(min_length=1, max_length=32)
+    label: str = Field(default="", max_length=128)
+    url: str = Field(default="", max_length=2048)
+    type: str = Field(default="file", max_length=16)
+    content: str = Field(default="", description="base64 of the profile yaml")
+    sort_order: int = 0
+
+
+class ProfileSyncIn(BaseModel):
+    since: int = Field(default=0, ge=0)
+    upserts: list[ProfilePayloadIn] = Field(default_factory=list)
+    deletes: list[str] = Field(default_factory=list)
+
+
+class ProfileOut(BaseModel):
+    profile_id: str
+    label: str
+    url: str
+    type: str
+    content: str
+    checksum: str
+    sort_order: int
+    revision: int
+
+
+class ProfileSyncOut(BaseModel):
+    revision: int
+    upserts: list[ProfileOut]
+    tombstones: list[str]

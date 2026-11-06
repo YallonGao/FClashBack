@@ -17,7 +17,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import BASE_DIR, get_settings
 from .db import init_db
-from .routers import auth, devices, subscriptions, sync
+from .routers import auth, devices, subscriptions, sync, sync_profiles
 
 log = logging.getLogger("fclash")
 
@@ -45,6 +45,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api/v1")
     app.include_router(devices.router, prefix="/api/v1")
     app.include_router(sync.router, prefix="/api/v1")
+    app.include_router(sync_profiles.router, prefix="/api/v1")
     app.include_router(subscriptions.router, prefix="/api/v1")
 
     @app.get("/healthz", tags=["meta"])
