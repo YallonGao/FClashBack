@@ -15,6 +15,7 @@ from ..models import Device, User
 from ..schemas import (
     DeviceIn,
     LoginIn,
+    PasswordChangeIn,
     RefreshIn,
     RegisterIn,
     SessionOut,
@@ -128,3 +129,16 @@ def refresh(
 @router.get("/me", response_model=UserOut)
 def me(principal: Principal = Depends(get_principal)) -> UserOut:
     return UserOut.model_validate(principal.user)
+
+
+@router.post("/password", status_code=status.HTTP_204_NO_CONTENT)
+def change_password(
+    payload: PasswordChangeIn,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> None:
+    """The console changes the password; the app only ever signs in."""
+    if not verify_password(payload.current_password, principal.user.password_hash):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="wrong_password")
+    principal.user.password_hash = hash_password(payload.new_password)
+    db.commit()

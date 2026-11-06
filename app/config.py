@@ -40,6 +40,7 @@ class Settings:
     max_snapshot_bytes: int
     history_limit: int
     allow_registration: bool
+    allow_private_fetch: bool
     data_dir: Path
 
     @property
@@ -63,5 +64,8 @@ def get_settings() -> Settings:
         max_snapshot_bytes=_int("FCLASH_MAX_SNAPSHOT_BYTES", 8 * 1024 * 1024),
         history_limit=_int("FCLASH_HISTORY_LIMIT", 20),
         allow_registration=_bool("FCLASH_ALLOW_REGISTRATION", True),
+        # Subscription refresh fetches whatever URL the owner stored. Local
+        # and link-local targets stay blocked unless someone opts in.
+        allow_private_fetch=_bool("FCLASH_ALLOW_PRIVATE_FETCH", False),
         data_dir=data_dir,
     )

@@ -10,6 +10,7 @@ os.environ["FCLASH_DATA_DIR"] = _TMP
 os.environ["FCLASH_DATABASE_URL"] = f"sqlite:///{_TMP}/test.db"
 os.environ["FCLASH_JWT_SECRET"] = "test-secret-0123456789abcdef0123456789"
 os.environ["FCLASH_HISTORY_LIMIT"] = "5"
+os.environ["FCLASH_ALLOW_PRIVATE_FETCH"] = "true"
 
 from fastapi.testclient import TestClient  # noqa: E402
 

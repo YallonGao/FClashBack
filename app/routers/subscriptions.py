@@ -11,10 +11,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from ..config import Settings, get_settings
 from ..db import get_db
 from ..deps import Principal, get_principal
 from ..models import Subscription, utcnow
 from ..schemas import SubscriptionIn, SubscriptionOut, SubscriptionPatch
+from ..subscription_fetch import FetchError, fetch_usage
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
@@ -82,3 +84,35 @@ def delete_subscription(
     subscription = _owned(db, principal.user.id, subscription_id)
     db.delete(subscription)
     db.commit()
+
+
+@router.post("/{subscription_id}/refresh", response_model=SubscriptionOut)
+def refresh_subscription(
+    subscription_id: str,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> SubscriptionOut:
+    """Ask the airport for its own traffic and expiry numbers.
+
+    The URL comes from the account owner, so it is only reachable after the
+    address check in [fetch_usage]; the body is never read.
+    """
+    subscription = _owned(db, principal.user.id, subscription_id)
+    if not subscription.url:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail="no_url")
+    try:
+        usage = fetch_usage(
+            subscription.url, allow_private=settings.allow_private_fetch
+        )
+    except FetchError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=exc.code) from exc
+
+    subscription.traffic_used = usage.used
+    if usage.total:
+        subscription.traffic_total = usage.total
+    if usage.expire_at is not None:
+        subscription.expire_at = usage.expire_at
+    subscription.updated_at = utcnow()
+    db.commit()
+    return SubscriptionOut.model_validate(subscription)
