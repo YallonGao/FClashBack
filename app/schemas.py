@@ -2,11 +2,23 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PlainSerializer
 
 USERNAME_PATTERN = r"^[A-Za-z0-9_.-]{3,32}$"
+
+
+def _utc_iso(value: datetime) -> str:
+    # SQLite drops tzinfo, so a naive value is UTC. Serialising it without an
+    # offset makes a browser read it as local time and shift the day.
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    return value.isoformat()
+
+
+UtcDateTime = Annotated[datetime, PlainSerializer(_utc_iso, return_type=str)]
 
 
 class DeviceIn(BaseModel):
@@ -46,8 +58,8 @@ class DeviceOut(BaseModel):
     name: str
     platform: str
     revoked: bool
-    created_at: datetime
-    last_seen_at: datetime
+    created_at: UtcDateTime
+    last_seen_at: UtcDateTime
 
 
 class UserOut(BaseModel):
@@ -55,7 +67,7 @@ class UserOut(BaseModel):
 
     id: str
     username: str
-    created_at: datetime
+    created_at: UtcDateTime
 
 
 class SessionOut(BaseModel):
@@ -68,7 +80,7 @@ class SyncStateOut(BaseModel):
     revision: int
     checksum: str
     size: int
-    updated_at: datetime | None
+    updated_at: UtcDateTime | None
     device_id: str | None
 
 
@@ -77,7 +89,7 @@ class RevisionOut(BaseModel):
     checksum: str
     size: int
     device_id: str | None
-    created_at: datetime
+    created_at: UtcDateTime
 
 
 class PushResultOut(BaseModel):
@@ -128,8 +140,8 @@ class SubscriptionOut(BaseModel):
     password: str
     note: str
     enabled: bool
-    expire_at: datetime | None
+    expire_at: UtcDateTime | None
     traffic_used: int
     traffic_total: int
-    created_at: datetime
-    updated_at: datetime
+    created_at: UtcDateTime
+    updated_at: UtcDateTime
