@@ -15,8 +15,14 @@ from ..config import Settings, get_settings
 from ..db import get_db
 from ..deps import Principal, get_principal
 from ..models import Subscription, utcnow
-from ..schemas import SubscriptionIn, SubscriptionOut, SubscriptionPatch
-from ..subscription_fetch import FetchError, fetch_usage
+from ..schemas import (
+    SubscriptionIn,
+    SubscriptionOut,
+    SubscriptionPatch,
+    SubscriptionPreviewIn,
+    SubscriptionPreviewOut,
+)
+from ..subscription_fetch import FetchError, fetch_preview, fetch_usage
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
 
@@ -38,6 +44,29 @@ def list_subscriptions(
         .order_by(Subscription.created_at)
     ).all()
     return [SubscriptionOut.model_validate(row) for row in rows]
+
+
+@router.post("/preview", response_model=SubscriptionPreviewOut)
+def preview_subscription(
+    payload: SubscriptionPreviewIn,
+    principal: Principal = Depends(get_principal),
+    settings: Settings = Depends(get_settings),
+) -> SubscriptionPreviewOut:
+    """Fill a new subscription from its link before anything is saved."""
+    try:
+        preview = fetch_preview(
+            payload.url.strip(), allow_private=settings.allow_private_fetch
+        )
+    except FetchError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, detail=exc.code) from exc
+    usage = preview.usage
+    return SubscriptionPreviewOut(
+        name=preview.name,
+        site_url=preview.site_url,
+        traffic_used=usage.used if usage else 0,
+        traffic_total=usage.total if usage else 0,
+        expire_at=usage.expire_at if usage else None,
+    )
 
 
 @router.post("", response_model=SubscriptionOut, status_code=status.HTTP_201_CREATED)

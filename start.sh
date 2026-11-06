@@ -4,6 +4,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 PORT="${PORT:-8780}"
+HOST="${HOST:-127.0.0.1}"
 
 if [ ! -d .venv ]; then
   echo "creating .venv"
@@ -37,13 +38,13 @@ if [ -z "${FCLASH_FRONTEND_DIR:-}" ] && [ -f "$FRONTEND/index.html" ]; then
 fi
 
 echo
-echo "  API      http://127.0.0.1:${PORT}/docs"
+echo "  API      http://${HOST}:${PORT}/docs"
 if [ -n "${FCLASH_FRONTEND_DIR:-}" ]; then
-  echo "  Console  http://127.0.0.1:${PORT}/"
+  echo "  Console  http://${HOST}:${PORT}/"
 else
   echo "  Console  not built; run FClashFront/start.sh"
 fi
 echo "  Data     ${FCLASH_DATA_DIR}"
 echo
 
-exec ./.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port "$PORT" "$@"
+exec ./.venv/bin/python -m uvicorn app.main:app --host "$HOST" --port "$PORT" "$@"

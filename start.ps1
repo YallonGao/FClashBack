@@ -2,7 +2,9 @@
 # 需要 Python 3.11+，首次运行会自建 .venv 并安装依赖。
 param(
     [int]$Port = 8780,
-    [switch]$Reload
+    [switch]$Reload,
+    # Bind every interface so phones on the same network can reach the API.
+    [switch]$Lan
 )
 
 $ErrorActionPreference = "Stop"
@@ -48,6 +50,17 @@ Write-Host "  Console  $(if ($env:FCLASH_FRONTEND_DIR) { "http://127.0.0.1:$Port
 Write-Host "  Data     $env:FCLASH_DATA_DIR" -ForegroundColor DarkGray
 Write-Host ""
 
-$arguments = @("-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "$Port")
+$bindHost = if ($Lan) { "0.0.0.0" } else { "127.0.0.1" }
+if ($Lan) {
+    $address = (Get-NetIPAddress -AddressFamily IPv4 |
+        Where-Object { $_.IPAddress -notlike '127.*' -and $_.IPAddress -notlike '169.254.*' } |
+        Select-Object -First 1).IPAddress
+    if ($address) {
+        Write-Host "  LAN      http://$address`:$Port/  (phone uses this)" -ForegroundColor Yellow
+        Write-Host "           Windows 防火墙需要放行该端口" -ForegroundColor DarkGray
+    }
+}
+
+$arguments = @("-m", "uvicorn", "app.main:app", "--host", $bindHost, "--port", "$Port")
 if ($Reload) { $arguments += "--reload" }
 & .\.venv\Scripts\python.exe @arguments

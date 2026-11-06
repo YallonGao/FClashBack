@@ -134,6 +134,18 @@ class SubscriptionPatch(BaseModel):
     traffic_total: int | None = Field(default=None, ge=0)
 
 
+class SubscriptionPreviewIn(BaseModel):
+    url: str = Field(min_length=1, max_length=2048)
+
+
+class SubscriptionPreviewOut(BaseModel):
+    name: str
+    site_url: str
+    traffic_used: int
+    traffic_total: int
+    expire_at: UtcDateTime | None
+
+
 class SubscriptionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
