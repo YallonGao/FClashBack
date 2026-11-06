@@ -118,3 +118,38 @@ class VaultRevision(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, nullable=False
     )
+
+
+class Subscription(Base):
+    """One airport subscription as the console sees it.
+
+    The sync snapshot stays opaque on purpose, but this table is structured:
+    the console lists subscriptions, links each to the airport's own site, and
+    keeps the account bought there next to it. Stored values are returned only
+    to the owner of the account over an authenticated request.
+    """
+
+    __tablename__ = "subscriptions"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    name: Mapped[str] = mapped_column(String(64))
+    url: Mapped[str] = mapped_column(String(2048), default="")
+    site_url: Mapped[str] = mapped_column(String(512), default="")
+    account: Mapped[str] = mapped_column(String(128), default="")
+    password: Mapped[str] = mapped_column(String(256), default="")
+    note: Mapped[str] = mapped_column(String(1024), default="")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    expire_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    traffic_used: Mapped[int] = mapped_column(BigInteger, default=0)
+    traffic_total: Mapped[int] = mapped_column(BigInteger, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )

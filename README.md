@@ -7,6 +7,7 @@ FlClash 的账号与配置同步服务端。一个账号下多台设备共用一
 - 同步单元：不透明二进制快照（客户端决定内容，服务端只存字节）
 - 并发模型：`base_revision` 乐观锁；冲突返回 409 并带上当前版本号
 - 历史：保留最近 N 个版本，可回滚
+- 订阅台账：结构化的机场记录（官网、机场账号、到期、流量），供 Web 控制台管理
 
 ## 本地运行
 
@@ -118,6 +119,10 @@ sqlite3 /data/fclash.db ".backup '/backup/fclash-$(date +%F).db'"
 | GET | `/sync/history` | 历史版本列表 |
 | GET | `/sync/history/{revision}` | 指定版本内容 |
 | POST | `/sync/restore/{revision}?base_revision=N` | 把旧版本恢复成新版本 |
+| GET | `/subscriptions` | 订阅台账列表 |
+| POST | `/subscriptions` | 新增订阅 `{name, url, site_url, account, password, note, enabled, expire_at, traffic_used, traffic_total}` |
+| PATCH | `/subscriptions/{id}` | 只改传入的字段 |
+| DELETE | `/subscriptions/{id}` | 删除订阅 |
 
 冲突响应：
 
@@ -138,9 +143,30 @@ sqlite3 /data/fclash.db ".backup '/backup/fclash-$(date +%F).db'"
 - 客户端按 `revision` 做本地缓存：拉取后记下版本号，上传时作为 `base_revision`。
 - 离线时客户端不允许改配置——这由客户端保证，服务端只负责拒绝过期写入。
 
+## 控制台（FClashFront）
+
+控制台是纯静态站点，构建后放进 `frontend/`，后端会在同一域名下托管它：
+
+```bash
+# 在 FClashFront 仓库
+npm install && npm run build
+# 产物 dist/ 整个复制到服务器
+scp -r dist/* server:/opt/fclash-back/frontend/
+```
+
+`app/main.py` 会检测 `frontend/index.html`，存在就挂载静态资源并接管其余路由；不存在则保持纯 API 部署。也可以用 `FCLASH_FRONTEND_DIR` 指向别处。这样浏览器和后端同源，不需要处理 CORS。
+
+## 运维命令
+
+```bash
+# 忘记密码时在服务器上重置（不走 HTTP，避免控制台被用来改密码）
+python -m app.cli reset-password <username>
+```
+
 ## 安全边界
 
 - 快照里是代理订阅，等同于密码。**必须走 HTTPS**，别用明文 80 端口。
 - 服务端不做端到端加密；如果以后要防「服务器被拖库」，在客户端加一层对称加密再把密文当快照上传即可，接口不用改。
 - 注册默认开放，部署完立刻注册自己的账号，然后把 `FCLASH_ALLOW_REGISTRATION` 设为 `false`。
+- 订阅台账里的机场密码需要回显给本人，因此按原样存入数据库；数据库文件等同凭据库，请限制 `FCLASH_DATA_DIR` 的权限，备份时加密。
 - 没有内置限流，公网部署建议在 Nginx 上加 `limit_req`。

@@ -89,3 +89,47 @@ class ConflictOut(BaseModel):
     detail: str = "revision_conflict"
     current_revision: int
     current_checksum: str
+
+
+class SubscriptionIn(BaseModel):
+    name: str = Field(min_length=1, max_length=64)
+    url: str = Field(default="", max_length=2048)
+    site_url: str = Field(default="", max_length=512)
+    account: str = Field(default="", max_length=128)
+    password: str = Field(default="", max_length=256)
+    note: str = Field(default="", max_length=1024)
+    enabled: bool = True
+    expire_at: datetime | None = None
+    traffic_used: int = Field(default=0, ge=0)
+    traffic_total: int = Field(default=0, ge=0)
+
+
+class SubscriptionPatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    url: str | None = Field(default=None, max_length=2048)
+    site_url: str | None = Field(default=None, max_length=512)
+    account: str | None = Field(default=None, max_length=128)
+    password: str | None = Field(default=None, max_length=256)
+    note: str | None = Field(default=None, max_length=1024)
+    enabled: bool | None = None
+    expire_at: datetime | None = None
+    traffic_used: int | None = Field(default=None, ge=0)
+    traffic_total: int | None = Field(default=None, ge=0)
+
+
+class SubscriptionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    name: str
+    url: str
+    site_url: str
+    account: str
+    password: str
+    note: str
+    enabled: bool
+    expire_at: datetime | None
+    traffic_used: int
+    traffic_total: int
+    created_at: datetime
+    updated_at: datetime
