@@ -28,6 +28,8 @@ from ..models import (
     utcnow,
 )
 from ..schemas import (
+    CloudCheckIn,
+    CloudCheckOut,
     CloudConflictOut,
     CloudItemAdminOut,
     CloudItemOut,
@@ -235,6 +237,31 @@ def sync(
         ],
         conflicts=[_conflict_out(row) for row in conflicts],
     )
+
+
+@router.post("/check", response_model=CloudCheckOut)
+def check(
+    payload: CloudCheckIn,
+    principal: Principal = Depends(get_principal),
+    db: Session = Depends(get_db),
+) -> CloudCheckOut:
+    """Which of these hashes the cloud already holds.
+
+    Content-addressed on purpose: a device can ask about the things it has
+    without inventing an id for them, which is what rules and DNS lack.
+    """
+    wanted = {value for value in payload.checksums if value}
+    if not wanted:
+        return CloudCheckOut(present=[])
+    rows = db.scalars(
+        select(CloudItem.item_id).where(
+            CloudItem.user_id == principal.user.id,
+            CloudItem.kind == payload.kind,
+            CloudItem.deleted.is_(False),
+            CloudItem.item_id.in_(wanted),
+        )
+    ).all()
+    return CloudCheckOut(present=list(rows))
 
 
 @router.get("/items", response_model=list[CloudItemAdminOut])

@@ -223,3 +223,61 @@ def test_editing_something_the_cloud_deleted_is_a_conflict(client, account):
         headers=account["headers"],
     )
     assert [item["item_id"] for item in _items(client, account["headers"])] == ["p1"]
+
+
+def _second_device(client, account):
+    """Log the same account in from another device and return its headers."""
+    response = client.post(
+        "/api/v1/auth/login",
+        json={
+            "username": account["username"],
+            "password": account["password"],
+            "device": {"key": "device-second-01", "name": "second", "platform": "web"},
+        },
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    return {"Authorization": f"Bearer {body['tokens']['access_token']}"}, body["device"]["id"]
+
+
+def test_a_second_device_conflict_replaces_the_first_one(client, account):
+    """Documents a known limit: one conflict slot per item.
+
+    Both devices must be stale for a conflict, so each upload below is based
+    on C1 while the cloud has moved to C2. The second device's conflict takes
+    the slot; the first device's copy still exists on that device, only the
+    console view keeps one. Per-device conflicts need a schema change.
+    """
+    first = _sync(client, account["headers"], uploads=[_upload("p1", content="v1")])
+    c1 = first["items"][0]["checksum"]
+
+    second_headers, second_device = _second_device(client, account)
+
+    # B moves the cloud to C2, so both later uploads are based on a dead version.
+    moved = _sync(
+        client,
+        second_headers,
+        since=first["revision"],
+        uploads=[_upload_based("p1", c1, title="From B", content="v2")],
+    )
+    assert moved["conflicts"] == []
+    c2 = [item for item in moved["items"] if item["item_id"] == "p1"][0]["checksum"]
+    assert c2 != c1
+
+    a = _sync(
+        client,
+        account["headers"],
+        since=moved["revision"],
+        uploads=[_upload_based("p1", c1, title="From A", content="v3")],
+    )
+    assert [row["device_title"] for row in a["conflicts"]] == ["From A"]
+
+    b = _sync(
+        client,
+        second_headers,
+        since=moved["revision"],
+        uploads=[_upload_based("p1", c1, title="From B again", content="v4")],
+    )
+    assert len(b["conflicts"]) == 1, b["conflicts"]
+    assert b["conflicts"][0]["device_title"] == "From B again"
+    assert b["conflicts"][0]["device_id"] == second_device

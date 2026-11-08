@@ -233,6 +233,15 @@ class CloudTombstone(BaseModel):
     item_id: str
 
 
+class CloudCheckIn(BaseModel):
+    kind: str = Field(min_length=1, max_length=16)
+    checksums: list[str] = Field(default_factory=list, max_length=500)
+
+
+class CloudCheckOut(BaseModel):
+    present: list[str]
+
+
 class CloudConflictOut(BaseModel):
     # extra="forbid" so a field the router forgets to declare is an error
     # instead of being dropped silently.
