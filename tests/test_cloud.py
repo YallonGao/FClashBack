@@ -281,3 +281,29 @@ def test_a_second_device_conflict_replaces_the_first_one(client, account):
     assert len(b["conflicts"]) == 1, b["conflicts"]
     assert b["conflicts"][0]["device_title"] == "From B again"
     assert b["conflicts"][0]["device_id"] == second_device
+
+
+def test_check_answers_presence_by_checksum(client, account):
+    first = _sync(client, account["headers"], uploads=[_upload("p1", content="v1")])
+    checksum = first["items"][0]["checksum"]
+
+    missing = client.post(
+        "/api/v1/cloud/check",
+        json={"kind": "profile", "checksums": ["0" * 64]},
+        headers=account["headers"],
+    )
+    assert missing.json()["present"] == []
+
+    present = client.post(
+        "/api/v1/cloud/check",
+        json={"kind": "profile", "checksums": [checksum]},
+        headers=account["headers"],
+    )
+    assert present.json()["present"] == [checksum]
+
+    other_kind = client.post(
+        "/api/v1/cloud/check",
+        json={"kind": "rule", "checksums": [checksum]},
+        headers=account["headers"],
+    )
+    assert other_kind.json()["present"] == []

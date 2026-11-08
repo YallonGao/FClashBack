@@ -253,12 +253,14 @@ def check(
     wanted = {value for value in payload.checksums if value}
     if not wanted:
         return CloudCheckOut(present=[])
+    # Match the stored content hash, not item_id: an upload may carry any id,
+    # but the checksum is what defines "the cloud has this exact content".
     rows = db.scalars(
-        select(CloudItem.item_id).where(
+        select(CloudItem.checksum).where(
             CloudItem.user_id == principal.user.id,
             CloudItem.kind == payload.kind,
             CloudItem.deleted.is_(False),
-            CloudItem.item_id.in_(wanted),
+            CloudItem.checksum.in_(wanted),
         )
     ).all()
     return CloudCheckOut(present=list(rows))
