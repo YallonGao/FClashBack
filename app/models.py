@@ -199,3 +199,89 @@ class SyncRevision(Base):
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
     revision: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+
+
+class CloudItem(Base):
+    """One uploadable thing: a profile, a DNS block, a rule, a script.
+
+    Unlike the old snapshot this is a catalogue, not a mirror: a device only
+    uploads what its owner asked it to, so "is this on the server" is a real
+    question with a real answer.
+    """
+
+    __tablename__ = "cloud_items"
+    __table_args__ = (
+        UniqueConstraint("user_id", "kind", "item_id", name="uq_cloud_item"),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(16), index=True)
+    item_id: Mapped[str] = mapped_column(String(64))
+    title: Mapped[str] = mapped_column(String(128), default="")
+    content: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    checksum: Mapped[str] = mapped_column(String(64), default="")
+    uploader_device_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    revision: Mapped[int] = mapped_column(Integer, default=0, index=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class DeviceHolding(Base):
+    """What a device reported holding at its last connection.
+
+    The console answers "which devices still have this rule" from here, so the
+    answer is only as fresh as the device's last sync.
+    """
+
+    __tablename__ = "device_holdings"
+
+    device_id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(16), primary_key=True)
+    item_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
+
+
+class CloudConflict(Base):
+    """Two versions of one item that cannot both win.
+
+    The server no longer pushes anything to devices, so a conflict is stored
+    here and resolved by a person in the console: the device's upload is kept
+    aside instead of overwriting the cloud copy.
+    """
+
+    __tablename__ = "cloud_conflicts"
+    __table_args__ = (
+        UniqueConstraint("user_id", "kind", "item_id", name="uq_cloud_conflict"),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True
+    )
+    user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    kind: Mapped[str] = mapped_column(String(16))
+    item_id: Mapped[str] = mapped_column(String(64))
+    cloud_title: Mapped[str] = mapped_column(String(128), default="")
+    cloud_content: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    cloud_checksum: Mapped[str] = mapped_column(String(64), default="")
+    cloud_deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    device_title: Mapped[str] = mapped_column(String(128), default="")
+    device_content: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    device_checksum: Mapped[str] = mapped_column(String(64), default="")
+    device_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )

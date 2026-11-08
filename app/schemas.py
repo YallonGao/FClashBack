@@ -194,3 +194,89 @@ class ProfileSyncOut(BaseModel):
     revision: int
     upserts: list[ProfileOut]
     tombstones: list[str]
+
+
+class CloudUploadIn(BaseModel):
+    kind: str = Field(min_length=1, max_length=16)
+    item_id: str = Field(min_length=1, max_length=64)
+    title: str = Field(default="", max_length=128)
+    content: str = Field(default="", description="base64")
+    # The checksum this edit was based on. Empty means "first upload".
+    # A mismatch is a conflict, not an overwrite.
+    base_checksum: str = Field(default="", max_length=64)
+
+
+class CloudSyncIn(BaseModel):
+    since: int = Field(default=0, ge=0)
+    uploads: list[CloudUploadIn] = Field(default_factory=list)
+    # A kind that is absent means "this client says nothing about it", which
+    # must not be read as "holds nothing".
+    holdings: dict[str, list[str]] = Field(default_factory=dict)
+
+
+class CloudItemOut(BaseModel):
+    kind: str
+    item_id: str
+    title: str
+    content: str
+    # checksum covers title + content: renaming is a change worth uploading.
+    checksum: str
+    # content_hash covers the body alone: it answers "did the payload move",
+    # which is what a URL subscription does on every airport refresh.
+    content_hash: str
+    revision: int
+    uploader_device_id: str | None
+
+
+class CloudTombstone(BaseModel):
+    kind: str
+    item_id: str
+
+
+class CloudConflictOut(BaseModel):
+    # extra="forbid" so a field the router forgets to declare is an error
+    # instead of being dropped silently.
+    model_config = ConfigDict(extra="forbid")
+
+    kind: str
+    item_id: str
+    cloud_title: str
+    cloud_content: str
+    cloud_checksum: str
+    cloud_deleted: bool
+    device_title: str
+    device_content: str
+    device_checksum: str
+    device_id: str | None
+    created_at: UtcDateTime
+
+
+class CloudSyncOut(BaseModel):
+    revision: int
+    items: list[CloudItemOut]
+    tombstones: list[CloudTombstone]
+    conflicts: list[CloudConflictOut]
+
+
+class CloudHolderOut(BaseModel):
+    device_id: str
+    name: str
+    last_seen_at: UtcDateTime
+
+
+class CloudItemMetaOut(BaseModel):
+    kind: str
+    item_id: str
+    title: str
+    checksum: str
+    revision: int
+    uploader_device_id: str | None
+
+
+class CloudItemAdminOut(CloudItemMetaOut):
+    uploader_name: str
+    holders: list[CloudHolderOut] = Field(default_factory=list)
+
+
+class ResolveConflictIn(BaseModel):
+    keep: str = Field(pattern="^(cloud|uploaded)$")
